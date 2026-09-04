@@ -1,9 +1,9 @@
 'use client';
 // src/components/ConfirmationCard.tsx
-// Post-submission success state.
-// Fires postMessage to parent window (for iframe modal integration).
+// High-End Luxury Booking Confirmation & Next Steps Hub
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/navigation';
 
 interface ConfirmationCardProps {
   bookingReference: string;
@@ -21,11 +21,10 @@ export default function ConfirmationCard({
   onClose,
 }: ConfirmationCardProps) {
   const messageSent = useRef(false);
+  const [copied, setCopied] = useState<boolean>(false);
 
   useEffect(() => {
-    // Fire postMessage to parent window — used by the iframe modal in the main site.
-    // Parent should listen: window.addEventListener('message', handler)
-    // and close the modal on { type: 'GRAFTON_BOOKING_COMPLETE' }
+    // Fire postMessage to parent window for iframe integration
     if (!messageSent.current && typeof window !== 'undefined' && window.parent !== window) {
       window.parent.postMessage(
         {
@@ -37,82 +36,119 @@ export default function ConfirmationCard({
             departureDate: departureDate ?? null,
           },
         },
-        '*' // In production, replace '*' with 'https://grafton-public-website.vercel.app'
+        '*'
       );
       messageSent.current = true;
     }
   }, [bookingReference, guestName, packageTitle, departureDate]);
 
-  const firstName = guestName.split(' ')[0];
+  const firstName = guestName ? guestName.split(' ')[0] : 'Traveler';
+
+  const handleCopyRef = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(bookingReference);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
+  };
 
   return (
-    <div className="gs-confirmation">
-      <div className="gs-confirmation-icon" aria-hidden="true">🌍</div>
-
-      <h2 style={{ marginBottom: '8px' }}>Your safari journey begins here!</h2>
-      <p style={{ maxWidth: '440px', margin: '0 auto' }}>
-        Thank you, {firstName}. Your booking inquiry for{' '}
-        <strong style={{ color: 'var(--gs-forest)' }}>{packageTitle}</strong> has been
-        received. Our team will be in touch within 24–48 hours.
-      </p>
-
-      <div className="gs-confirmation-ref" aria-label={`Booking reference: ${bookingReference}`}>
-        {bookingReference}
-      </div>
-
-      <p style={{ fontSize: '0.8125rem', marginBottom: 'var(--space-xl)', color: 'var(--gs-text-muted)' }}>
-        A confirmation has been sent to your email address. Please keep your reference number
-        for follow-up correspondence.
-      </p>
-
-      {departureDate && (
-        <div
-          style={{
-            background: 'var(--gs-sand)',
-            border: '1px solid var(--gs-sand-dark)',
-            borderRadius: 'var(--radius-md)',
-            padding: '16px 24px',
-            display: 'inline-block',
-            marginBottom: 'var(--space-xl)',
-            textAlign: 'left',
-          }}
-        >
-          <p style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-            Departure Date
-          </p>
-          <p style={{ fontSize: '1rem', color: 'var(--gs-forest)', fontWeight: 600 }}>
-            {new Date(departureDate).toLocaleDateString('en-GB', {
-              weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-            })}
-          </p>
+    <div className="gs-confirmation-page-container">
+      <div className="gs-confirmation-card">
+        {/* Animated Success Badge */}
+        <div className="gs-confirmation-badge-wrap">
+          <div className="gs-confirmation-check-circle">✓</div>
         </div>
-      )}
 
-      <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-        <a
-          href="mailto:gstt@graftonsafaris.com"
-          className="gs-btn gs-btn-ghost"
-          aria-label="Contact Grafton Safaris by email"
-        >
-          📧 Contact Us
-        </a>
-        <a
-          href="https://grafton-public-website.vercel.app"
-          target="_top"
-          className="gs-btn gs-btn-primary"
-          aria-label="Return to Grafton Safaris website"
-        >
-          Return to Website
-        </a>
-        {onClose && (
+        {/* Header Tag & Title */}
+        <span className="gs-badge-olive" style={{ marginBottom: '10px' }}>
+          Inquiry Received · Specialist Review
+        </span>
+        <h2 className="gs-confirmation-headline">Your Safari Journey Begins Here</h2>
+
+        {/* Narrative Paragraph */}
+        <p className="gs-confirmation-message">
+          Thank you, <strong>{firstName}</strong>. Your customized safari proposal request for{' '}
+          <strong style={{ color: 'var(--gs-forest)' }}>{packageTitle}</strong> has been received by our Arusha operations team. A dedicated safari consultant will review your route and contact you within <strong>24–48 hours</strong> with your finalized quotation.
+        </p>
+
+        {/* Booking Reference Highlight Box */}
+        <div className="gs-confirmation-ref-box">
+          <div>
+            <span className="gs-confirmation-ref-label">YOUR GRAFTON REFERENCE CODE</span>
+            <span className="gs-confirmation-ref-code">{bookingReference}</span>
+          </div>
           <button
-            className="gs-btn gs-btn-ghost"
-            onClick={onClose}
-            aria-label="Close this window"
+            type="button"
+            onClick={handleCopyRef}
+            className="gs-btn-copy-ref"
+            title="Copy reference code"
           >
-            Close
+            {copied ? '✓ Copied' : 'Copy Code'}
           </button>
+        </div>
+
+        {/* Trip Parameters Highlights */}
+        {departureDate && (
+          <div className="gs-confirmation-params-grid">
+            <div className="gs-confirmation-param-item">
+              <span className="gs-confirmation-param-label">Target Departure</span>
+              <span className="gs-confirmation-param-val">
+                {new Date(departureDate).toLocaleDateString('en-GB', {
+                  weekday: 'short',
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                })}
+              </span>
+            </div>
+            <div className="gs-confirmation-param-item">
+              <span className="gs-confirmation-param-label">Proposal Status</span>
+              <span className="gs-confirmation-param-val" style={{ color: 'var(--gs-orange)' }}>
+                ⏳ Under Specialist Review
+              </span>
+            </div>
+            <div className="gs-confirmation-param-item">
+              <span className="gs-confirmation-param-label">Client Portal Access</span>
+              <span className="gs-confirmation-param-val" style={{ color: '#2E7D52' }}>
+                ✓ Synchronized to Account
+              </span>
+            </div>
+          </div>
         )}
+
+        <p className="gs-confirmation-note">
+          A summary has been dispatched to your email address. You can also track consultant updates or re-open your itinerary anytime in the <strong>My Journeys Portal</strong>.
+        </p>
+
+        {/* Actions Button Row */}
+        <div className="gs-confirmation-actions-row">
+          <a
+            href={`/my-trips?ref=${encodeURIComponent(bookingReference)}`}
+            className="gs-btn-orange"
+            style={{ padding: '12px 24px', fontSize: '0.9rem', textDecoration: 'none' }}
+          >
+            Track in My Journeys Portal ➔
+          </a>
+
+          <a
+            href="mailto:gstt@graftonsafaris.com"
+            className="gs-btn-portal-back"
+            style={{ textDecoration: 'none' }}
+          >
+            ✉ Contact Specialist
+          </a>
+
+          {onClose && (
+            <button
+              type="button"
+              className="gs-btn-portal-back"
+              onClick={onClose}
+            >
+              Back to Catalog
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

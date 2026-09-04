@@ -1,16 +1,20 @@
 'use client';
 // src/app/my-trips/page.tsx
-// Customer "My Journeys" Portal — View, Re-open, and Manage Safari Drafts & Quotes
+// Customer "My Journeys" Portal — High-End Proposal & Itinerary Hub
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getSavedDrafts, SavedItineraryDraft, removeItineraryDraft } from '@/lib/draftStorage';
+import { SAFARI_PACKAGES, GLOBAL_ADDONS } from '@/data/packages';
 
 interface BookingRecord {
   id: string;
   booking_reference: string;
   package_id: number;
   travel_type: string;
+  full_name?: string;
+  email?: string;
+  phone?: string;
   arrival_date?: string;
   travel_duration: string;
   adults: number;
@@ -19,6 +23,7 @@ interface BookingRecord {
   booking_status: string;
   payment_status: string;
   created_at: string;
+  custom_message?: string;
   preferences?: {
     accommodationTier?: string;
     travelMonth?: string;
@@ -51,6 +56,7 @@ function MyTripsContent() {
   const [browserDrafts, setBrowserDrafts] = useState<SavedItineraryDraft[]>([]);
   const [searched, setSearched] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [viewingBooking, setViewingBooking] = useState<BookingRecord | null>(null);
 
   useEffect(() => {
     setBrowserDrafts(getSavedDrafts());
@@ -64,7 +70,7 @@ function MyTripsContent() {
     const e = (emailVal ?? searchEmail).trim();
 
     if (!r && !e) {
-      setErrorMsg('Please enter your email address or booking reference.');
+      setErrorMsg('Please enter your email address or booking reference code.');
       return;
     }
 
@@ -83,7 +89,7 @@ function MyTripsContent() {
       if (json.success) {
         setServerBookings(json.data || []);
       } else {
-        setErrorMsg(json.error || 'Lookup failed.');
+        setErrorMsg(json.error || 'No matching proposals found.');
       }
     } catch {
       setErrorMsg('Network error. Please try again.');
@@ -92,14 +98,31 @@ function MyTripsContent() {
     }
   };
 
-  const handleReopenInCustomizer = (packageId: number, tier?: string, adultsCount?: number, childrenCount?: number, date?: string) => {
+  const handleReopenInCustomizer = (
+    packageId: number,
+    tier?: string,
+    adultsCount?: number,
+    childrenCount?: number,
+    date?: string,
+    month?: string,
+    addonIds?: string[],
+    singleRoom?: boolean
+  ) => {
     const params = new URLSearchParams({
       package: packageId.toString(),
       tier: tier || 'Comfort',
       adults: (adultsCount || 2).toString(),
       children: (childrenCount || 0).toString(),
+      openPlan: 'true',
     });
     if (date) params.set('date', date);
+    if (month) params.set('month', month);
+    if (addonIds && addonIds.length > 0) {
+      params.set('addons', addonIds.join(','));
+    }
+    if (singleRoom) {
+      params.set('singleRoom', '1');
+    }
     router.push(`/?${params.toString()}`);
   };
 
@@ -111,55 +134,67 @@ function MyTripsContent() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'confirmed':
-        return <span className="gs-badge-gold" style={{ background: 'rgba(46, 125, 82, 0.2)', color: '#2E7D52', borderColor: '#2E7D52' }}>✓ Final Quotation Issued</span>;
+        return (
+          <span className="gs-portal-status-badge is-confirmed">
+            ✓ Final Quotation Issued
+          </span>
+        );
       case 'cancelled':
-        return <span className="gs-badge-glass" style={{ color: 'var(--gs-error)', borderColor: 'var(--gs-error)' }}>✕ Cancelled</span>;
+        return (
+          <span className="gs-portal-status-badge is-cancelled">
+            ✕ Cancelled
+          </span>
+        );
       case 'pending':
       default:
-        return <span className="gs-badge-gold">⏳ Under Grafton Review</span>;
+        return (
+          <span className="gs-portal-status-badge is-pending">
+            ⏳ Under Grafton Review
+          </span>
+        );
     }
   };
 
   return (
-    <div className="gs-app-shell">
-      {/* Header */}
-      <header className="gs-editorial-header">
-        <div className="gs-header-brand-wrap" style={{ cursor: 'pointer' }} onClick={() => router.push('/')}>
-          <div className="gs-brand-monogram">G</div>
-          <div className="gs-brand-titles">
-            <h1>Grafton Safaris</h1>
-            <span>My Journeys & Proposals</span>
+    <div className="gs-portal-page-shell">
+      {/* Top Navigation Bar */}
+      <header className="gs-portal-header">
+        <div className="gs-portal-header-inner">
+          <div className="gs-portal-brand" onClick={() => router.push('/')}>
+            <div className="gs-portal-logo-mark">G</div>
+            <div className="gs-portal-brand-text">
+              <span className="gs-portal-brand-title">GRAFTON SAFARIS</span>
+              <span className="gs-portal-brand-subtitle">Traveler Portfolio &amp; Proposals</span>
+            </div>
           </div>
-        </div>
 
-        <div className="gs-header-nav-actions">
-          <button onClick={() => router.push('/')} className="gs-btn gs-btn-ghost-light gs-btn-sm">
-            ← Safari Catalog
+          <button onClick={() => router.push('/')} className="gs-btn-portal-back">
+            ← Explore Safaris
           </button>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main style={{ flex: 1, padding: '40px 24px', maxWidth: '1000px', margin: '0 auto', width: '100%' }}>
-        <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-          <span className="gs-badge-gold">Traveler Portal</span>
-          <h2 style={{ fontSize: 'clamp(2rem, 3.5vw, 2.8rem)', margin: '12px 0 8px' }}>
-            Your Saved Journeys & Quotations
-          </h2>
-          <p style={{ color: 'var(--gs-text-muted)', fontSize: '0.95rem' }}>
-            Look up your bespoke safari proposals using your reference code or email address.
+      {/* Main Container */}
+      <main className="gs-portal-main">
+        {/* Hero Section */}
+        <section className="gs-portal-hero-section">
+          <span className="gs-badge-olive">Private Traveler Hub</span>
+          <h1 className="gs-portal-hero-title">Your Saved Journeys &amp; Proposals</h1>
+          <p className="gs-portal-hero-desc">
+            Look up your tailored safari proposals, track live consultation status, or resume customizing saved itinerary drafts.
           </p>
-        </div>
+        </section>
 
-        {/* Lookup Card */}
-        <div className="gs-builder-card" style={{ marginBottom: '32px' }}>
-          <h3 style={{ fontSize: '1.2rem', marginBottom: '16px', color: 'var(--gs-forest)' }}>
-            🔍 Look Up Your Grafton Proposal
-          </h3>
+        {/* Search & Lookup Card */}
+        <section className="gs-portal-card gs-portal-search-card">
+          <div className="gs-portal-card-header">
+            <h3 className="gs-portal-card-title">Look Up Your Grafton Proposal</h3>
+            <p className="gs-portal-card-desc">Enter your unique reference code (e.g. GSF-2027-4912) or the email used during quote submission.</p>
+          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '16px' }}>
-            <div>
-              <label className="gs-label">Booking Reference</label>
+          <div className="gs-portal-search-grid">
+            <div className="gs-field">
+              <label className="gs-label">Booking Reference Code</label>
               <input
                 type="text"
                 className="gs-input"
@@ -170,12 +205,12 @@ function MyTripsContent() {
               />
             </div>
 
-            <div>
-              <label className="gs-label">Or Email Address</label>
+            <div className="gs-field">
+              <label className="gs-label">Or Registered Email</label>
               <input
                 type="email"
                 className="gs-input"
-                placeholder="you@email.com"
+                placeholder="traveler@domain.com"
                 value={searchEmail}
                 onChange={(e) => setSearchEmail(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleLookup()}
@@ -184,136 +219,198 @@ function MyTripsContent() {
           </div>
 
           {errorMsg && (
-            <div className="gs-alert gs-alert-error" style={{ marginBottom: '14px' }}>
+            <div className="gs-alert gs-alert-error" style={{ marginTop: '14px' }}>
               <span>⚠</span> <span>{errorMsg}</span>
             </div>
           )}
 
-          <button
-            onClick={() => handleLookup()}
-            className="gs-btn gs-btn-gold gs-btn-md gs-glow-btn"
-            disabled={loading}
-          >
-            {loading ? <span className="gs-spinner" /> : 'Find My Proposals ➔'}
-          </button>
-        </div>
+          <div style={{ marginTop: '18px', display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => handleLookup()}
+              className="gs-btn-orange"
+              style={{ padding: '12px 28px', fontSize: '0.9rem' }}
+              disabled={loading}
+            >
+              {loading ? 'Searching Proposals…' : 'Find My Proposals ➔'}
+            </button>
+          </div>
+        </section>
 
-        {/* Server Found Bookings */}
+        {/* Submitted Proposals Results */}
         {searched && (
-          <div style={{ marginBottom: '40px' }}>
-            <h3 style={{ fontSize: '1.3rem', marginBottom: '16px', color: 'var(--gs-forest)' }}>
-              Submitted Proposals ({serverBookings.length})
-            </h3>
+          <section className="gs-portal-results-section">
+            <div className="gs-portal-section-header">
+              <h3 className="gs-portal-section-title">
+                Submitted Proposals <span className="gs-portal-count-badge">{serverBookings.length}</span>
+              </h3>
+            </div>
 
             {serverBookings.length === 0 ? (
-              <div className="gs-builder-card" style={{ textAlign: 'center', padding: '32px' }}>
-                <p style={{ color: 'var(--gs-text-muted)' }}>No submitted proposals found matching this search.</p>
+              <div className="gs-portal-empty-card">
+                <div className="gs-portal-empty-icon">📂</div>
+                <h4 className="gs-portal-empty-title">No Proposals Found</h4>
+                <p className="gs-portal-empty-desc">
+                  We could not locate any active proposals matching this reference or email. Please double-check your spelling or contact your Grafton travel specialist.
+                </p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="gs-portal-proposals-grid">
                 {serverBookings.map((b) => (
-                  <div key={b.id} className="gs-builder-card" style={{ padding: '24px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '14px' }}>
+                  <div key={b.id} className="gs-portal-proposal-card">
+                    <div className="gs-portal-proposal-header">
                       <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', color: 'var(--gs-gold-dark)' }}>
-                            {b.booking_reference}
-                          </span>
+                        <div className="gs-portal-ref-row">
+                          <span className="gs-portal-ref-code">{b.booking_reference}</span>
                           {getStatusBadge(b.booking_status)}
                         </div>
-                        <h4 style={{ fontSize: '1.3rem', margin: '4px 0', color: 'var(--gs-forest)' }}>
-                          {b.travel_type}
-                        </h4>
-                        <div style={{ fontSize: '0.84rem', color: 'var(--gs-text-muted)' }}>
+                        <h4 className="gs-portal-proposal-name">{b.travel_type}</h4>
+                        <span className="gs-portal-date-sub">
                           Submitted on {new Date(b.created_at).toLocaleDateString()} · {b.travel_duration}
-                        </div>
+                        </span>
                       </div>
 
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--gs-text-muted)' }}>Quoted Rate</span>
-                        <div style={{ fontFamily: 'var(--font-editorial)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--gs-forest)' }}>
+                      <div className="gs-portal-price-col">
+                        <span className="gs-portal-price-label">Quoted Investment</span>
+                        <span className="gs-portal-price-val">
                           {b.preferences?.finalQuotedPrice
                             ? `$${b.preferences.finalQuotedPrice.toLocaleString()}`
                             : b.preferences?.indicativeTotalPrice
-                            ? `$${b.preferences.indicativeTotalPrice.toLocaleString()} (Indicative)`
-                            : 'Price under review'}
-                        </div>
+                            ? `$${b.preferences.indicativeTotalPrice.toLocaleString()}`
+                            : 'Under Review'}
+                        </span>
+                        {b.preferences?.finalQuotedPrice ? (
+                          <span className="gs-portal-price-sub">Guaranteed Rate</span>
+                        ) : (
+                          <span className="gs-portal-price-sub">Indicative Estimate</span>
+                        )}
                       </div>
                     </div>
 
-                    <div style={{ background: 'var(--gs-sand)', borderRadius: 'var(--radius-sm)', padding: '14px', marginBottom: '16px', fontSize: '0.85rem' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
-                        <div><strong>Party:</strong> {b.adults} Adults{b.children > 0 ? `, ${b.children} Children` : ''}</div>
-                        <div><strong>Dates:</strong> {b.arrival_date || b.preferences?.travelMonth || 'Flexible'}</div>
-                        <div><strong>Tier:</strong> {b.preferences?.accommodationTier || 'Comfort'} Accommodation</div>
-                        <div><strong>Payment:</strong> <span style={{ textTransform: 'capitalize' }}>{b.payment_status.replace('_', ' ')}</span></div>
+                    {/* Proposal Details Pill Grid */}
+                    <div className="gs-portal-params-grid">
+                      <div className="gs-portal-param-box">
+                        <span className="gs-portal-param-label">Party</span>
+                        <span className="gs-portal-param-val">
+                          {b.adults} Adults{b.children > 0 ? `, ${b.children} Children` : ''}
+                        </span>
                       </div>
-
-                      {b.preferences?.consultantNotes && (
-                        <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed var(--gs-sand-dark)', color: 'var(--gs-forest)' }}>
-                          <strong>Consultant Notes:</strong> {b.preferences.consultantNotes}
-                        </div>
-                      )}
+                      <div className="gs-portal-param-box">
+                        <span className="gs-portal-param-label">Timing</span>
+                        <span className="gs-portal-param-val">
+                          {b.arrival_date || b.preferences?.travelMonth || 'Flexible Season'}
+                        </span>
+                      </div>
+                      <div className="gs-portal-param-box">
+                        <span className="gs-portal-param-label">Accommodation</span>
+                        <span className="gs-portal-param-val">
+                          {b.preferences?.accommodationTier || 'Comfort'} Standard
+                        </span>
+                      </div>
+                      <div className="gs-portal-param-box">
+                        <span className="gs-portal-param-label">Payment</span>
+                        <span className="gs-portal-param-val" style={{ textTransform: 'capitalize' }}>
+                          {b.payment_status.replace('_', ' ')}
+                        </span>
+                      </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    {/* Consultant Feedback Notes */}
+                    {b.preferences?.consultantNotes && (
+                      <div className="gs-portal-consultant-notes">
+                        <span className="gs-portal-notes-title">💬 Message from Grafton Specialist:</span>
+                        <p className="gs-portal-notes-text">{b.preferences.consultantNotes}</p>
+                      </div>
+                    )}
+
+                    {/* Action Row */}
+                    <div className="gs-portal-proposal-footer" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                       <button
-                        onClick={() => handleReopenInCustomizer(b.package_id, b.preferences?.accommodationTier, b.adults, b.children, b.arrival_date)}
-                        className="gs-btn gs-btn-gold gs-btn-sm"
+                        onClick={() => setViewingBooking(b)}
+                        className="gs-btn-portal-back"
+                        style={{ padding: '9px 18px', fontSize: '0.84rem' }}
                       >
-                        Re-open in Customizer ➔
+                        View Proposal Dossier 🔍
+                      </button>
+                      <button
+                        onClick={() => handleReopenInCustomizer(
+                          b.package_id,
+                          b.preferences?.accommodationTier,
+                          b.adults,
+                          b.children,
+                          b.arrival_date,
+                          b.preferences?.travelMonth,
+                          b.preferences?.selectedAddonIds,
+                          b.single_room_requested
+                        )}
+                        className="gs-btn-orange"
+                        style={{ padding: '10px 20px', fontSize: '0.85rem' }}
+                      >
+                        Re-open &amp; Customize Itinerary ➔
                       </button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
-          </div>
+          </section>
         )}
 
-        {/* Local 30-Day Browser Drafts */}
-        <div>
-          <h3 style={{ fontSize: '1.3rem', marginBottom: '16px', color: 'var(--gs-forest)' }}>
-            💾 Saved Browser Drafts (30-Day Storage: {browserDrafts.length})
-          </h3>
-
-          {browserDrafts.length === 0 ? (
-            <div className="gs-builder-card" style={{ textAlign: 'center', padding: '24px' }}>
-              <p style={{ color: 'var(--gs-text-muted)' }}>No saved browser drafts. When you click "Save Draft" in the customizer, your itineraries appear here.</p>
+        {/* If User Has Active Local Browser Drafts, show them */}
+        {browserDrafts.length > 0 && (
+          <section className="gs-portal-drafts-section">
+            <div className="gs-portal-section-header">
+              <div>
+                <h3 className="gs-portal-section-title">
+                  Saved Browser Drafts <span className="gs-portal-count-badge">{browserDrafts.length}</span>
+                </h3>
+                <p className="gs-portal-section-desc">Unfinished custom itineraries stored in your local browser for up to 30 days.</p>
+              </div>
             </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+
+            <div className="gs-portal-drafts-grid">
               {browserDrafts.map((d) => (
-                <div key={d.id} className="gs-builder-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <span className="gs-badge-gold-sm">{d.accommodationTier}</span>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--gs-text-muted)' }}>
+                <div key={d.id} className="gs-portal-draft-card">
+                  <div className="gs-portal-draft-header">
+                    <span className="gs-badge-olive">{d.accommodationTier} Tier</span>
+                    <span className="gs-portal-draft-expiry">
                       Expires: {new Date(d.expiresAt).toLocaleDateString()}
                     </span>
                   </div>
 
-                  <h4 style={{ margin: '4px 0', fontSize: '1.1rem', color: 'var(--gs-forest)' }}>
-                    {d.packageTitle}
-                  </h4>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--gs-text-muted)', marginBottom: '14px' }}>
+                  <h4 className="gs-portal-draft-title">{d.packageTitle}</h4>
+                  <p className="gs-portal-draft-party">
                     {d.adults} Adults{d.children > 0 ? `, ${d.children} Children` : ''} · {d.travelMonth || 'Flexible'}
                   </p>
 
-                  <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontFamily: 'var(--font-editorial)', fontSize: '1.2rem', fontWeight: 700, color: 'var(--gs-forest)' }}>
-                      {d.indicativePricePerPerson ? `$${d.indicativePricePerPerson.toLocaleString()} pp` : 'Under review'}
-                    </span>
+                  <div className="gs-portal-draft-footer">
+                    <div className="gs-portal-draft-price">
+                      <span className="gs-portal-draft-price-val">
+                        {d.indicativePricePerPerson ? `$${d.indicativePricePerPerson.toLocaleString()}` : 'Under review'}
+                      </span>
+                      <span className="gs-portal-draft-price-unit">/ person</span>
+                    </div>
 
-                    <div style={{ display: 'flex', gap: '6px' }}>
+                    <div style={{ display: 'flex', gap: '8px' }}>
                       <button
-                        onClick={() => handleReopenInCustomizer(d.packageId, d.accommodationTier, d.adults, d.children, d.travelDate)}
-                        className="gs-btn gs-btn-gold gs-btn-sm"
+                        onClick={() => handleReopenInCustomizer(
+                          d.packageId,
+                          d.accommodationTier,
+                          d.adults,
+                          d.children,
+                          d.travelDate,
+                          d.travelMonth,
+                          d.selectedAddonIds,
+                          (d.rooms?.singleRooms || 0) > 0
+                        )}
+                        className="gs-btn-orange"
+                        style={{ padding: '8px 16px', fontSize: '0.82rem' }}
                       >
-                        Open ➔
+                        Resume ➔
                       </button>
                       <button
                         onClick={() => handleDeleteLocalDraft(d.id)}
-                        className="gs-btn gs-btn-ghost gs-btn-sm"
+                        className="gs-btn-portal-delete"
+                        title="Delete draft"
                       >
                         🗑
                       </button>
@@ -322,8 +419,248 @@ function MyTripsContent() {
                 </div>
               ))}
             </div>
-          )}
-        </div>
+          </section>
+        )}
+
+        {/* Prestigious Value Pillars & Support for Logged-Out / Unsearched Travelers */}
+        {!searched && browserDrafts.length === 0 && (
+          <section className="gs-portal-pillars-section">
+            <div className="gs-portal-pillars-grid">
+              <div className="gs-portal-pillar-card">
+                <div className="gs-portal-pillar-icon">🗺️</div>
+                <h4 className="gs-portal-pillar-title">Real-Time Proposal Tracking</h4>
+                <p className="gs-portal-pillar-desc">
+                  Access your bespoke safari quotes, vetted lodge allocations, and customized route timelines directly online.
+                </p>
+              </div>
+
+              <div className="gs-portal-pillar-card">
+                <div className="gs-portal-pillar-icon">💬</div>
+                <h4 className="gs-portal-pillar-title">Direct Specialist Notes</h4>
+                <p className="gs-portal-pillar-desc">
+                  Read personalized guidance, flight recommendations, and timing insights from senior safari consultants in Arusha.
+                </p>
+              </div>
+
+              <div className="gs-portal-pillar-card">
+                <div className="gs-portal-pillar-icon">✏️</div>
+                <h4 className="gs-portal-pillar-title">1-Click Itinerary Revisions</h4>
+                <p className="gs-portal-pillar-desc">
+                  Seamlessly re-open your itinerary in the interactive planner to tweak guest counts, travel dates, or comfort tiers.
+                </p>
+              </div>
+            </div>
+
+            {/* Assistance Strip */}
+            <div className="gs-portal-help-strip">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '1.4rem' }}>🛎️</span>
+                <div>
+                  <strong style={{ display: 'block', color: 'var(--gs-forest)', fontSize: '0.9rem' }}>
+                    Need help locating your reference code?
+                  </strong>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--gs-text-muted)' }}>
+                    Reference codes follow the format <code>GSF-YYYY-XXXX</code> and are included in your confirmation email.
+                  </span>
+                </div>
+              </div>
+              <a
+                href="mailto:gstt@graftonsafaris.com"
+                className="gs-btn-portal-back"
+                style={{ textDecoration: 'none', whiteSpace: 'nowrap' }}
+              >
+                Contact Concierge ➔
+              </a>
+            </div>
+          </section>
+        )}
+
+        {/* ── Customer Proposal Dossier Modal ────────────────────────────── */}
+        {viewingBooking && (() => {
+          const selectedAddonObjects = (viewingBooking.preferences?.selectedAddonIds || [])
+            .map((id) => GLOBAL_ADDONS.find((a) => a.id === id))
+            .filter(Boolean);
+
+          const indicativeTotal = viewingBooking.preferences?.indicativeTotalPrice;
+          const indicativePerPerson = viewingBooking.preferences?.indicativePricePerPerson;
+          const finalPrice = viewingBooking.preferences?.finalQuotedPrice;
+          const totalGuests = (viewingBooking.adults || 0) + (viewingBooking.children || 0) || 1;
+
+          return (
+            <div className="gs-modal-backdrop" onClick={() => setViewingBooking(null)}>
+              <div
+                className="gs-admin-review-modal-card"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="gs-admin-review-modal-header">
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                      <span className="gs-badge-olive">Safari Proposal Dossier</span>
+                      <span className="gs-admin-ref-code">{viewingBooking.booking_reference}</span>
+                      {getStatusBadge(viewingBooking.booking_status)}
+                    </div>
+                    <h2 className="gs-admin-review-modal-title">
+                      {viewingBooking.travel_type}
+                    </h2>
+                    <p className="gs-admin-review-modal-sub">
+                      Submitted on {new Date(viewingBooking.created_at).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} · {viewingBooking.travel_duration}
+                    </p>
+                  </div>
+                  <button onClick={() => setViewingBooking(null)} className="gs-modal-close-btn" aria-label="Close modal">✕</button>
+                </div>
+
+                <div className="gs-admin-review-modal-body">
+                  {/* Section 1: Specifications Grid */}
+                  <div className="gs-admin-dossier-grid">
+                    <div className="gs-admin-dossier-cell">
+                      <span className="gs-admin-dossier-label">Departure Timing</span>
+                      <span className="gs-admin-dossier-val">
+                        {viewingBooking.arrival_date
+                          ? new Date(viewingBooking.arrival_date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+                          : viewingBooking.preferences?.travelMonth || 'Dates flexible'}
+                      </span>
+                    </div>
+
+                    <div className="gs-admin-dossier-cell">
+                      <span className="gs-admin-dossier-label">Preferred Season / Month</span>
+                      <span className="gs-admin-dossier-val">
+                        {viewingBooking.preferences?.travelMonth || 'Flexible Season'}
+                        {viewingBooking.preferences?.season ? ` (${viewingBooking.preferences.season})` : ''}
+                      </span>
+                    </div>
+
+                    <div className="gs-admin-dossier-cell">
+                      <span className="gs-admin-dossier-label">Party Composition</span>
+                      <span className="gs-admin-dossier-val">
+                        {viewingBooking.adults} Adults{viewingBooking.children > 0 ? `, ${viewingBooking.children} Children` : ''}
+                        {viewingBooking.single_room_requested ? ' · Single Room' : ''}
+                      </span>
+                    </div>
+
+                    <div className="gs-admin-dossier-cell">
+                      <span className="gs-admin-dossier-label">Accommodation Standard</span>
+                      <span className="gs-admin-dossier-val" style={{ color: 'var(--gs-olive)' }}>
+                        ★ {viewingBooking.preferences?.accommodationTier || 'Comfort'} Tier
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Section 2: Selected Add-On Experiences */}
+                  <div className="gs-admin-dossier-addons-block">
+                    <span className="gs-admin-dossier-section-title">
+                      Selected Add-On Experiences ({selectedAddonObjects.length})
+                    </span>
+                    {selectedAddonObjects.length === 0 ? (
+                      <p className="gs-admin-addons-empty">No optional add-ons requested for this itinerary.</p>
+                    ) : (
+                      <div className="gs-admin-addons-chips-grid">
+                        {selectedAddonObjects.map((addon) => addon && (
+                          <div key={addon.id} className="gs-admin-addon-chip">
+                            <div>
+                              <strong className="gs-admin-addon-name">{addon.name}</strong>
+                              <span className="gs-admin-addon-desc">{addon.description || addon.locations?.join(' · ')}</span>
+                            </div>
+                            <span className="gs-admin-addon-price">+${addon.pricePerPerson} pp</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Section 3: Client Special Requests */}
+                  {viewingBooking.custom_message && (
+                    <div className="gs-admin-client-note-card">
+                      <span className="gs-admin-client-note-label">💬 Your Special Requests &amp; Notes:</span>
+                      <p className="gs-admin-client-note-quote">"{viewingBooking.custom_message}"</p>
+                    </div>
+                  )}
+
+                  {/* Section 4: Consultant Message & Confirmation */}
+                  {viewingBooking.preferences?.consultantNotes && (
+                    <div className="gs-portal-consultant-notes" style={{ padding: '16px 20px', borderRadius: '14px' }}>
+                      <span className="gs-portal-notes-title" style={{ fontSize: '0.82rem', marginBottom: '6px' }}>
+                        💬 Message from Grafton Safari Specialist:
+                      </span>
+                      <p className="gs-portal-notes-text" style={{ fontSize: '0.88rem' }}>
+                        {viewingBooking.preferences.consultantNotes}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Section 5: Financial Overview */}
+                  <div className="gs-admin-quotation-edit-section" style={{ background: '#FAF8F4' }}>
+                    <div className="gs-admin-pricing-benchmarks" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+                      <div>
+                        <span className="gs-admin-bench-label">
+                          {finalPrice ? 'Guaranteed Quoted Investment' : 'Indicative Pricing Estimate'}
+                        </span>
+                        <span className="gs-admin-bench-val" style={{ color: finalPrice ? '#2E7D52' : 'var(--gs-forest)' }}>
+                          {finalPrice
+                            ? `$${finalPrice.toLocaleString()}`
+                            : indicativeTotal
+                            ? `$${indicativeTotal.toLocaleString()}`
+                            : 'Under Review'}
+                        </span>
+                        <span className="gs-admin-bench-sub">
+                          ({finalPrice
+                            ? `$${Math.round(finalPrice / totalGuests).toLocaleString()}`
+                            : indicativePerPerson
+                            ? `$${indicativePerPerson.toLocaleString()}`
+                            : 'Calculated'} per person)
+                        </span>
+                      </div>
+                      <div>
+                        <span className="gs-badge-olive">
+                          Payment Status: {viewingBooking.payment_status.replace('_', ' ').toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Modal Actions */}
+                  <div className="gs-admin-modal-footer">
+                    <button
+                      type="button"
+                      onClick={() => setViewingBooking(null)}
+                      className="gs-btn-portal-back"
+                    >
+                      Close
+                    </button>
+                    <a
+                      href={`mailto:gstt@graftonsafaris.com?subject=Inquiry on Proposal ${viewingBooking.booking_reference}`}
+                      className="gs-btn-portal-back"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      ✉ Contact Specialist
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetBooking = viewingBooking;
+                        setViewingBooking(null);
+                        handleReopenInCustomizer(
+                          targetBooking.package_id,
+                          targetBooking.preferences?.accommodationTier,
+                          targetBooking.adults,
+                          targetBooking.children,
+                          targetBooking.arrival_date,
+                          targetBooking.preferences?.travelMonth,
+                          targetBooking.preferences?.selectedAddonIds,
+                          targetBooking.single_room_requested
+                        );
+                      }}
+                      className="gs-btn-orange"
+                      style={{ padding: '12px 24px', fontSize: '0.88rem' }}
+                    >
+                      Re-open &amp; Customize in Planner ➔
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </main>
     </div>
   );
@@ -336,3 +673,4 @@ export default function MyTripsPage() {
     </Suspense>
   );
 }
+
